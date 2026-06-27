@@ -4,3 +4,6 @@ lib/
 .mocharc.yml
 *.pdf
 test/*.actual
+
+# Rust build artifacts
+rust/target
