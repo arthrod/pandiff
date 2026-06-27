@@ -3,7 +3,7 @@
 //! exercise the full pipeline and require `pandoc` (and the test fixtures under
 //! `../test`) to be available.
 
-use pandiff::options::{Metadata, Options};
+use pandiff::options::{Metadata, Options, Wrap as WrapOpt};
 use pandiff::{pandiff, Wrap};
 use pretty_assertions::assert_eq;
 use std::path::PathBuf;
@@ -294,6 +294,66 @@ fn output_word_docx_round_trip() {
         .unwrap()
         .unwrap();
     assert_eq!(text, golden("docx_roundtrip"));
+}
+
+#[test]
+fn columns_option_controls_wrap_width() {
+    if !pandoc_available() {
+        return;
+    }
+    let out = pandiff(
+        &test_path("old.md"),
+        &test_path("new.md"),
+        Options {
+            files: true,
+            resource_path: Some(test_path("")),
+            columns: Some(40),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(out, golden("cols40"));
+}
+
+#[test]
+fn wrap_none_disables_wrapping() {
+    if !pandoc_available() {
+        return;
+    }
+    let out = pandiff(
+        &test_path("old.md"),
+        &test_path("new.md"),
+        Options {
+            files: true,
+            resource_path: Some(test_path("")),
+            wrap: Some(WrapOpt::None),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(out, golden("wrapnone"));
+}
+
+#[test]
+fn reference_links_option() {
+    if !pandoc_available() {
+        return;
+    }
+    let out = pandiff(
+        &test_path("old.md"),
+        &test_path("new.md"),
+        Options {
+            files: true,
+            resource_path: Some(test_path("")),
+            reference_links: true,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(out, golden("reflinks"));
 }
 
 #[test]
