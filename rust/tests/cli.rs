@@ -120,3 +120,35 @@ fn single_md_runs_normalise() {
         .success()
         .stdout(predicates::str::contains("{~~fonts~>font-styles~~}"));
 }
+
+#[test]
+fn dash_reads_first_source_from_stdin() {
+    if !pandoc_available() {
+        return;
+    }
+    Command::cargo_bin("pandiff")
+        .unwrap()
+        .arg("--resource-path")
+        .arg(test_path(""))
+        .args(["-", &test_path("new.md")])
+        .write_stdin(std::fs::read_to_string(test_path("old.md")).unwrap())
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("{~~Old~>New~~} Title"));
+}
+
+#[test]
+fn errors_exit_nonzero_with_message() {
+    if !pandoc_available() {
+        return;
+    }
+    Command::cargo_bin("pandiff")
+        .unwrap()
+        .args([
+            test_path("does_not_exist_1.md"),
+            test_path("does_not_exist_2.md"),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("Error:"));
+}

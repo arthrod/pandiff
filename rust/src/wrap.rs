@@ -126,4 +126,15 @@ mod tests {
     fn wrap_preserves_internal_multiple_spaces_within_limit() {
         assert_eq!(wordwrap(72, "one  two   three"), "one  two   three");
     }
+
+    #[test]
+    fn wrap_handles_embedded_newline_within_limit() {
+        // A chunk containing '\n' that still fits exercises the newline branch.
+        assert_eq!(wordwrap(72, "a\nb"), "a\nb");
+    }
+
+    #[test]
+    fn wrap_handles_tab_expansion() {
+        assert_eq!(wordwrap(72, "a\tb"), "a    b");
+    }
 }

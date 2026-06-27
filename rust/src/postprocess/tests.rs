@@ -44,9 +44,41 @@ const VECTORS: &[(&str, &str)] = &[
     ),
 ];
 
+/// Figure-transform variants exercising the single-image, no-figcaption, and
+/// empty-figcaption branches. Captured from the reference implementation.
+const FIGURE_VECTORS: &[(&str, &str)] = &[
+    // Single image → transform is skipped, figure left intact.
+    (
+        "<figure><img src=\"a.png\" alt=\"x\"><figcaption>x</figcaption></figure>",
+        "<html><head></head><body><figure><img src=\"a.png\" alt=\"x\"><figcaption>x</figcaption></figure></body></html>",
+    ),
+    // Two images, no figcaption → caption defaults to "image".
+    (
+        "<figure><del><img src=\"a.png\"></del><ins><img src=\"b.png\"></ins></figure>",
+        "<html><head></head><body><span class=\"del\"><img src=\"a.png\" alt=\"image\"></span><p></p><span class=\"ins\"><img src=\"b.png\" alt=\"image\"></span></body></html>",
+    ),
+    // Two images, empty figcaption → caption also defaults to "image".
+    (
+        "<figure><del><img src=\"a.png\"></del><ins><img src=\"b.png\"></ins><figcaption></figcaption></figure>",
+        "<html><head></head><body><span class=\"del\"><img src=\"a.png\" alt=\"image\"></span><p></p><span class=\"ins\"><img src=\"b.png\" alt=\"image\"></span></body></html>",
+    ),
+    // Two inserted images, none deleted → the deleted block is skipped.
+    (
+        "<figure><ins><img src=\"a.png\"></ins><ins><img src=\"b.png\"></ins></figure>",
+        "<html><head></head><body><span class=\"ins\"><img src=\"a.png\" alt=\"image\"></span></body></html>",
+    ),
+];
+
 #[test]
 fn matches_jsdom_postprocess() {
     for (input, expected) in VECTORS {
+        assert_eq!(&postprocess(input), expected, "input={input:?}");
+    }
+}
+
+#[test]
+fn figure_transform_variants() {
+    for (input, expected) in FIGURE_VECTORS {
         assert_eq!(&postprocess(input), expected, "input={input:?}");
     }
 }

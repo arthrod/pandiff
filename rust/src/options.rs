@@ -179,4 +179,94 @@ mod tests {
             vec!["--from=html", "--to=markdown"]
         );
     }
+
+    #[test]
+    fn wrap_parse_all_variants() {
+        assert_eq!(Wrap::parse("auto"), Some(Wrap::Auto));
+        assert_eq!(Wrap::parse("none"), Some(Wrap::None));
+        assert_eq!(Wrap::parse("preserve"), Some(Wrap::Preserve));
+        assert_eq!(Wrap::parse("bogus"), None);
+    }
+
+    #[test]
+    fn metadata_parse_all_variants() {
+        assert_eq!(Metadata::parse("old"), Some(Metadata::Old));
+        assert_eq!(Metadata::parse("new"), Some(Metadata::New));
+        assert_eq!(Metadata::parse("none"), Some(Metadata::None));
+        assert_eq!(Metadata::parse("bogus"), None);
+    }
+
+    #[test]
+    fn build_args_covers_every_known_param() {
+        let o = Options {
+            bibliography: vec!["a.bib".into()],
+            csl: vec!["c.csl".into()],
+            extract_media: Some("/tmp".into()),
+            filter: vec!["f".into()],
+            from: Some("latex".into()),
+            highlight_style: Some("kate".into()),
+            lua_filter: vec!["l.lua".into()],
+            template: Some("t".into()),
+            mathjax: true,
+            mathml: true,
+            output: Some("o.html".into()),
+            pdf_engine: Some("lualatex".into()),
+            reference_links: true,
+            metadata_file: vec!["m.yaml".into()],
+            reference_doc: vec!["r.docx".into()],
+            resource_path: Some("res".into()),
+            standalone: true,
+            to: Some("html".into()),
+            ..Default::default()
+        };
+        let args = o.build_args(&[
+            "bibliography",
+            "csl",
+            "extract-media",
+            "filter",
+            "from",
+            "lua-filter",
+            "mathjax",
+            "mathml",
+            "resource-path",
+            "reference-links",
+            "highlight-style",
+            "output",
+            "template",
+            "pdf-engine",
+            "metadata-file",
+            "reference-doc",
+            "standalone",
+            "to",
+        ]);
+        assert_eq!(
+            args,
+            vec![
+                "--bibliography=a.bib",
+                "--csl=c.csl",
+                "--extract-media=/tmp",
+                "--filter=f",
+                "--from=latex",
+                "--lua-filter=l.lua",
+                "--mathjax",
+                "--mathml",
+                "--resource-path=res",
+                "--reference-links",
+                "--highlight-style=kate",
+                "--output=o.html",
+                "--template=t",
+                "--pdf-engine=lualatex",
+                "--metadata-file=m.yaml",
+                "--reference-doc=r.docx",
+                "--standalone",
+                "--to=html",
+            ]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown param")]
+    fn build_args_panics_on_unknown_param() {
+        Options::default().build_args(&["not-a-real-param"]);
+    }
 }

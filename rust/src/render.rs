@@ -25,14 +25,17 @@ fn asset_path(name: &str) -> String {
             return p.to_string_lossy().into_owned();
         }
     }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(d) = exe.parent() {
-            for cand in [d.join("assets").join(name), d.join("../assets").join(name)] {
-                if cand.exists() {
-                    return cand.to_string_lossy().into_owned();
-                }
-            }
-        }
+    let exe_hit = std::env::current_exe()
+        .ok()
+        .and_then(|exe| {
+            exe.parent()
+                .map(|d| [d.join("assets").join(name), d.join("../assets").join(name)])
+        })
+        .into_iter()
+        .flatten()
+        .find(|c| c.exists());
+    if let Some(c) = exe_hit {
+        return c.to_string_lossy().into_owned();
     }
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
@@ -70,15 +73,13 @@ pub fn render(html: &str, opts: &mut Options, metadata: &str) -> Result<Option<S
     let mut args = opts.build_args(&["reference-links"]);
     args.push("--wrap=none".to_string());
 
-    let mut output = pandoc(
-        &[
-            "-f".to_string(),
-            "html+tex_math_single_backslash".to_string(),
-            "-t".to_string(),
-            MARKDOWN.to_string(),
-        ],
-        Some(&html),
-    )?;
+    let first_args = [
+        "-f".to_string(),
+        "html+tex_math_single_backslash".to_string(),
+        "-t".to_string(),
+        MARKDOWN.to_string(),
+    ];
+    let mut output = pandoc(&first_args, Some(&html))?;
     let mut second = args.clone();
     second.push("-t".to_string());
     second.push(MARKDOWN.to_string());
@@ -86,10 +87,16 @@ pub fn render(html: &str, opts: &mut Options, metadata: &str) -> Result<Option<S
 
     output = critic::spans_to_critic(&output);
 
+    let text = rewrap(&output, opts.wrap == Some(Wrap::None), wrap_columns(opts));
+    postrender(&text, opts, metadata)
+}
+
+/// Re-wrap the markdown output line by line: leave code blocks and reference
+/// links untouched, truncate Setext underlines to the heading length, and soft
+/// word-wrap everything else (unless wrapping is disabled).
+fn rewrap(output: &str, no_wrap: bool, columns: usize) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut pre = false;
-    let no_wrap = opts.wrap == Some(Wrap::None);
-    let columns = wrap_columns(opts);
     for line in output.split('\n') {
         let last_line_len = lines.last().map(|l| l.chars().count()).unwrap_or(0);
         if line.starts_with("```") {
@@ -108,8 +115,7 @@ pub fn render(html: &str, opts: &mut Options, metadata: &str) -> Result<Option<S
             lines.push(line.to_string());
         }
     }
-    let text = lines.join("\n");
-    postrender(&text, opts, metadata)
+    lines.join("\n")
 }
 
 fn ext_of(output: &str) -> String {
@@ -126,6 +132,21 @@ pub fn postrender(text: &str, opts: &mut Options, metadata: &str) -> Result<Opti
         return Ok(Some(format!("{metadata}{text}")));
     }
 
+    let (body, args) = prepare_postrender(text, opts);
+    let input = format!("{metadata}{body}");
+    if opts.output.is_some() {
+        pandoc(&args, Some(&input))?;
+        Ok(None)
+    } else {
+        Ok(Some(pandoc(&args, Some(&input))?))
+    }
+}
+
+/// Apply the target-format-specific CriticMarkup transform and assemble the
+/// pandoc arguments (everything except the final pandoc invocation). Mutates
+/// `opts` (highlight-style default, `.pdf` ⇒ standalone) exactly like the
+/// original. Returned as a pure step so it can be tested without pandoc.
+fn prepare_postrender(text: &str, opts: &mut Options) -> (String, Vec<String>) {
     if opts.highlight_style.is_none() {
         opts.highlight_style = Some("kate".to_string());
     }
@@ -176,11 +197,159 @@ pub fn postrender(text: &str, opts: &mut Options, metadata: &str) -> Result<Opti
         args.push("-s".to_string());
     }
 
-    let input = format!("{metadata}{text}");
-    if opts.output.is_some() {
-        pandoc(&args, Some(&input))?;
-        Ok(None)
-    } else {
-        Ok(Some(pandoc(&args, Some(&input))?))
+    (text, args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ext_of_extracts_extension() {
+        assert_eq!(ext_of("diff.pdf"), ".pdf");
+        assert_eq!(ext_of("diff.docx"), ".docx");
+        assert_eq!(ext_of("noext"), "");
+    }
+
+    #[test]
+    fn wrap_columns_defaults_and_overrides() {
+        assert_eq!(wrap_columns(&Options::default()), 72);
+        assert_eq!(
+            wrap_columns(&Options {
+                columns: Some(0),
+                ..Default::default()
+            }),
+            72
+        );
+        assert_eq!(
+            wrap_columns(&Options {
+                columns: Some(40),
+                ..Default::default()
+            }),
+            40
+        );
+    }
+
+    #[test]
+    fn asset_path_resolves_env_exe_and_manifest() {
+        // 1. Executable-relative branch: create assets/ next to the test binary.
+        let exe = std::env::current_exe().unwrap();
+        let exe_dir = exe.parent().unwrap().to_path_buf();
+        let assets_dir = exe_dir.join("assets");
+        std::fs::create_dir_all(&assets_dir).unwrap();
+        let marker = assets_dir.join("cov_marker.css");
+        std::fs::write(&marker, "x").unwrap();
+        std::env::remove_var("PANDIFF_ASSETS");
+        assert_eq!(asset_path("cov_marker.css"), marker.to_string_lossy());
+        std::fs::remove_file(&marker).unwrap();
+
+        // 2. Environment-override branch.
+        let tmp = std::env::temp_dir().join("pandiff_assets_cov");
+        std::fs::create_dir_all(&tmp).unwrap();
+        let env_css = tmp.join("env.css");
+        std::fs::write(&env_css, "y").unwrap();
+        std::env::set_var("PANDIFF_ASSETS", &tmp);
+        assert_eq!(asset_path("env.css"), env_css.to_string_lossy());
+        // Env set but the requested file is absent → falls through past the env
+        // branch to the later fallbacks.
+        let missing = asset_path("not_in_env_dir.css");
+        assert!(!missing.starts_with(&*tmp.to_string_lossy()));
+        std::env::remove_var("PANDIFF_ASSETS");
+
+        // 3. Manifest fallback for a name that doesn't exist next to the exe.
+        let p = asset_path("definitely_missing_asset.css");
+        assert!(p.contains("assets"));
+        assert!(p.ends_with("definitely_missing_asset.css"));
+    }
+
+    #[test]
+    fn pandoc_options_html_lists_both_stylesheets() {
+        let opts = pandoc_options_html();
+        assert!(opts.iter().any(|a| a.ends_with("github-markdown.css")));
+        assert!(opts.iter().any(|a| a.ends_with("pandiff.css")));
+        assert!(opts.contains(&"--embed-resources".to_string()));
+    }
+
+    #[test]
+    fn rewrap_truncates_setext_underline_to_heading_length() {
+        // "Title" is 5 chars; the underline of 20 `=` should be truncated to 5.
+        let out = rewrap("Title\n====================\n\nbody", false, 72);
+        assert_eq!(out, "Title\n=====\n\nbody");
+    }
+
+    #[test]
+    fn rewrap_leaves_code_blocks_and_reference_links_untouched() {
+        let input = "```\na very long line that would otherwise be wrapped aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n```\n  [1]: http://example.com/very/long/url/that/exceeds/the/column/limit/aaaaaaaaaaaaaaaa";
+        // No wrapping inside the fenced block or on the reference-link line.
+        assert_eq!(rewrap(input, false, 72), input);
+    }
+
+    #[test]
+    fn rewrap_wraps_prose_unless_disabled() {
+        let long = "word ".repeat(30);
+        let wrapped = rewrap(&long, false, 72);
+        assert!(wrapped.contains('\n'));
+        let unwrapped = rewrap(&long, true, 72);
+        assert!(!unwrapped.contains('\n'));
+    }
+
+    #[test]
+    fn prepare_postrender_latex_via_to() {
+        let mut o = Options {
+            to: Some("latex".into()),
+            ..Default::default()
+        };
+        let (body, args) = prepare_postrender("{++x++}", &mut o);
+        assert!(body.contains("\\color{OliveGreen}"));
+        assert!(args.iter().any(|a| a == "colorlinks=true"));
+        assert_eq!(o.highlight_style.as_deref(), Some("kate"));
+    }
+
+    #[test]
+    fn prepare_postrender_pdf_output_forces_standalone() {
+        let mut o = Options {
+            output: Some("diff.pdf".into()),
+            ..Default::default()
+        };
+        let (body, args) = prepare_postrender("{--x--}", &mut o);
+        assert!(o.standalone, "pdf output should force standalone");
+        assert!(body.contains("\\color{Maroon}"));
+        assert!(args.contains(&"-s".to_string()));
+        assert!(args.contains(&"--output=diff.pdf".to_string()));
+    }
+
+    #[test]
+    fn prepare_postrender_docx_uses_track_changes() {
+        let mut o = Options {
+            output: Some("diff.docx".into()),
+            ..Default::default()
+        };
+        let (body, _args) = prepare_postrender("{~~a~>b~~}", &mut o);
+        assert!(body.contains("class=\"deletion\""));
+        assert!(body.contains("class=\"insertion\""));
+    }
+
+    #[test]
+    fn prepare_postrender_html_standalone_embeds_css_and_wraps_paragraphs() {
+        let mut o = Options {
+            to: Some("html".into()),
+            standalone: true,
+            ..Default::default()
+        };
+        let (body, args) = prepare_postrender("{++foo++}", &mut o);
+        assert!(body.starts_with("<p><ins>foo</ins></p>"));
+        assert!(args.iter().any(|a| a.ends_with("github-markdown.css")));
+        assert!(args.contains(&"-s".to_string()));
+    }
+
+    #[test]
+    fn prepare_postrender_html_non_standalone_omits_css() {
+        let mut o = Options {
+            output: Some("diff.html".into()),
+            ..Default::default()
+        };
+        let (_body, args) = prepare_postrender("{++foo++}", &mut o);
+        assert!(!args.iter().any(|a| a.ends_with("github-markdown.css")));
+        assert!(!args.contains(&"-s".to_string()));
     }
 }

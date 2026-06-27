@@ -40,3 +40,8 @@ pub fn pandoc(args: &[String], input: Option<&str>) -> Result<String> {
     }
     String::from_utf8(output.stdout).context("pandoc produced invalid UTF-8")
 }
+
+// The success path is exercised by every golden test; the non-zero-exit `bail`
+// is exercised by the CLI `errors_exit_nonzero_with_message` integration test.
+// Pandoc-dependent assertions live in tests/ so their skip-guards don't dilute
+// unit-coverage of the library.

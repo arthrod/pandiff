@@ -486,37 +486,37 @@ fn find_matching_blocks(segment: Segment) -> Vec<Match> {
     let mut segments = vec![segment];
 
     while let Some(segment) = segments.pop() {
+        // `find_best_match` only ever returns matches of length >= 1, so the
+        // JS `match.length` truthiness check is redundant here.
         if let Some(m) = find_best_match(&segment) {
-            if m.length > 0 {
-                if m.segment_start_in_before > 0 && m.segment_start_in_after > 0 {
-                    let left_before = segment.before_tokens[..m.segment_start_in_before].to_vec();
-                    let left_after = segment.after_tokens[..m.segment_start_in_after].to_vec();
-                    segments.push(create_segment(
-                        left_before,
-                        left_after,
-                        segment.before_index,
-                        segment.after_index,
-                    ));
-                }
-
-                let right_before_start = (m.segment_end_in_before + 1) as usize;
-                let right_after_start = (m.segment_end_in_after + 1) as usize;
-                let right_before = segment.before_tokens[right_before_start..].to_vec();
-                let right_after = segment.after_tokens[right_after_start..].to_vec();
-                let right_before_index = segment.before_index + right_before_start;
-                let right_after_index = segment.after_index + right_after_start;
-
-                if !right_before.is_empty() && !right_after.is_empty() {
-                    segments.push(create_segment(
-                        right_before,
-                        right_after,
-                        right_before_index,
-                        right_after_index,
-                    ));
-                }
-
-                matches.add(m);
+            if m.segment_start_in_before > 0 && m.segment_start_in_after > 0 {
+                let left_before = segment.before_tokens[..m.segment_start_in_before].to_vec();
+                let left_after = segment.after_tokens[..m.segment_start_in_after].to_vec();
+                segments.push(create_segment(
+                    left_before,
+                    left_after,
+                    segment.before_index,
+                    segment.after_index,
+                ));
             }
+
+            let right_before_start = (m.segment_end_in_before + 1) as usize;
+            let right_after_start = (m.segment_end_in_after + 1) as usize;
+            let right_before = segment.before_tokens[right_before_start..].to_vec();
+            let right_after = segment.after_tokens[right_after_start..].to_vec();
+            let right_before_index = segment.before_index + right_before_start;
+            let right_after_index = segment.after_index + right_after_start;
+
+            if !right_before.is_empty() && !right_after.is_empty() {
+                segments.push(create_segment(
+                    right_before,
+                    right_after,
+                    right_before_index,
+                    right_after_index,
+                ));
+            }
+
+            matches.add(m);
         }
     }
 
@@ -595,12 +595,16 @@ fn calculate_operations(before_tokens: &[Token], after_tokens: &[Token]) -> Vec<
         position_in_after = (m.end_in_after + 1) as usize;
     }
 
-    // Post-process: merge consecutive replace operations.
-    //
-    // The original also merges a "single whitespace equal" that follows a
-    // replace, but its `isSingleWhitespace` check coerces an array of token
-    // *objects* to the string "[object Object]", so it is always false. We
-    // preserve that behaviour (the branch is dead).
+    merge_consecutive_replaces(operations)
+}
+
+/// Post-process: merge consecutive `replace` operations into one.
+///
+/// The original also merges a "single whitespace equal" that follows a replace,
+/// but its `isSingleWhitespace` check coerces an array of token *objects* to the
+/// string "[object Object]", so it is always false. We preserve that behaviour
+/// (the branch is dead).
+fn merge_consecutive_replaces(operations: Vec<Operation>) -> Vec<Operation> {
     let mut post_processed: Vec<Operation> = Vec::new();
     let mut last_action = Action::Equal; // sentinel != replace; JS uses {action:'none'}
     let mut has_last = false;

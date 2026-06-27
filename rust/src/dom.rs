@@ -402,10 +402,9 @@ pub fn li_p_only_child(root: &Handle) -> Vec<Handle> {
             if tag_name(e).as_deref() != Some("p") {
                 return false;
             }
-            match parent(e) {
-                Some(p) => tag_name(&p).as_deref() == Some("li") && element_child_count(&p) == 1,
-                None => false,
-            }
+            parent(e).is_some_and(|p| {
+                tag_name(&p).as_deref() == Some("li") && element_child_count(&p) == 1
+            })
         })
         .collect()
 }

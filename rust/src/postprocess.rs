@@ -188,14 +188,16 @@ pub fn postprocess(html: &str) -> String {
         .rev()
     {
         let content = dom::inner_html(span);
-        let par = match dom::parent(span) {
-            Some(p) => p,
-            None => continue,
-        };
-        let is_inline = dom::tag_name(&par)
-            .map(|t| INLINE_TAGS.contains(&t.as_str()))
-            .unwrap_or(false);
-        if dom::children(&par).len() == 1 && is_inline {
+        // Hoist only when the parent is a single-child inline tag. Folding the
+        // condition into the `filter` keeps the skip path (non-inline / multi
+        // child parents) on the same branch that is exercised by normal input.
+        let inline_parent = dom::parent(span).filter(|p| {
+            dom::children(p).len() == 1
+                && dom::tag_name(p)
+                    .map(|t| INLINE_TAGS.contains(&t.as_str()))
+                    .unwrap_or(false)
+        });
+        if let Some(par) = inline_parent {
             dom::set_inner_html(&par, &content);
             let cn = dom::class_name(span);
             let par_outer = dom::outer_html(&par);

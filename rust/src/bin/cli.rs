@@ -139,12 +139,10 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
         help();
     }
 
-    if let Some(t) = text {
-        if !t.is_empty() {
-            let stdout = std::io::stdout();
-            let mut lock = stdout.lock();
-            lock.write_all(t.as_bytes())?;
-        }
+    if let Some(t) = text.filter(|t| !t.is_empty()) {
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        lock.write_all(t.as_bytes())?;
     }
     Ok(())
 }

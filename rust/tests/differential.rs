@@ -174,6 +174,18 @@ fn threshold_returns_none_below_cutoff() {
     )
     .unwrap();
     assert!(none.is_none());
+
+    // Threshold present but not exceeded → diff is still returned.
+    let kept = pandiff(
+        "foo bar baz",
+        "Foo bar baz",
+        Options {
+            threshold: Some(0.01),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(kept.as_deref(), Some("{~~foo~>Foo~~} bar baz\n"));
 }
 
 #[test]
