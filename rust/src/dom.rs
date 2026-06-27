@@ -366,9 +366,11 @@ pub fn elements_by_tag_and_classes(root: &Handle, tag: &str, classes: &[&str]) -
 
 /// First descendant element (document order) whose tag is one of `tags`.
 pub fn query_first_of_tags(root: &Handle, tags: &[&str]) -> Option<Handle> {
-    descendants(root)
-        .into_iter()
-        .find(|e| tag_name(e).map(|t| tags.contains(&t.as_str())).unwrap_or(false))
+    descendants(root).into_iter().find(|e| {
+        tag_name(e)
+            .map(|t| tags.contains(&t.as_str()))
+            .unwrap_or(false)
+    })
 }
 
 /// Does `node` have an ancestor with the given tag, searching up to but not

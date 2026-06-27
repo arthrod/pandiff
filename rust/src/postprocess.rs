@@ -47,7 +47,10 @@ pub fn postprocess(html: &str) -> String {
         }
         let pre_inner = dom::inner_html(math);
         let post_inner = dom::inner_html(&post);
-        dom::set_inner_html(math, &format!("<del>{pre_inner}</del><ins>{post_inner}</ins>"));
+        dom::set_inner_html(
+            math,
+            &format!("<del>{pre_inner}</del><ins>{post_inner}</ins>"),
+        );
     }
 
     // T3: strip style attributes from images.
@@ -71,7 +74,10 @@ pub fn postprocess(html: &str) -> String {
     }
 
     // T5: fix figures containing modified images.
-    for figure in dom::get_elements_by_tag_name(&document, "figure").iter().rev() {
+    for figure in dom::get_elements_by_tag_name(&document, "figure")
+        .iter()
+        .rev()
+    {
         let imgs = dom::get_elements_by_tag_name(figure, "img");
         if imgs.len() <= 1 {
             continue;
@@ -104,7 +110,11 @@ pub fn postprocess(html: &str) -> String {
         if let Some(img) = deleted_imgs.first() {
             let del_el = dom::create_element("del");
             let img_el = dom::create_element("img");
-            dom::set_attr(&img_el, "src", &dom::get_attr(img, "src").unwrap_or_default());
+            dom::set_attr(
+                &img_el,
+                "src",
+                &dom::get_attr(img, "src").unwrap_or_default(),
+            );
             dom::set_attr(&img_el, "alt", &caption_text);
             dom::append_child(&del_el, &img_el);
             dom::append_child(&container, &del_el);
@@ -116,7 +126,11 @@ pub fn postprocess(html: &str) -> String {
         if let Some(img) = inserted_imgs.first() {
             let ins_el = dom::create_element("ins");
             let img_el = dom::create_element("img");
-            dom::set_attr(&img_el, "src", &dom::get_attr(img, "src").unwrap_or_default());
+            dom::set_attr(
+                &img_el,
+                "src",
+                &dom::get_attr(img, "src").unwrap_or_default(),
+            );
             dom::set_attr(&img_el, "alt", &caption_text);
             dom::append_child(&ins_el, &img_el);
             dom::append_child(&container, &ins_el);
@@ -169,7 +183,10 @@ pub fn postprocess(html: &str) -> String {
     }
 
     // T10: pull diff spans outside inline tags when possible.
-    for span in dom::get_elements_by_tag_name(&document, "span").iter().rev() {
+    for span in dom::get_elements_by_tag_name(&document, "span")
+        .iter()
+        .rev()
+    {
         let content = dom::inner_html(span);
         let par = match dom::parent(span) {
             Some(p) => p,
@@ -187,7 +204,10 @@ pub fn postprocess(html: &str) -> String {
     }
 
     // T11: merge adjacent diff spans of the same class.
-    for span in dom::get_elements_by_tag_name(&document, "span").iter().rev() {
+    for span in dom::get_elements_by_tag_name(&document, "span")
+        .iter()
+        .rev()
+    {
         if let Some(next) = dom::next_sibling(span) {
             if dom::is_element(&next) && dom::class_name(span) == dom::class_name(&next) {
                 let merged = format!("{}{}", dom::inner_html(span), dom::inner_html(&next));
@@ -213,7 +233,10 @@ pub fn postprocess(html: &str) -> String {
     }
 
     // T13: identify substitutions (adjacent del + ins → sub).
-    for span in dom::get_elements_by_tag_name(&document, "span").iter().rev() {
+    for span in dom::get_elements_by_tag_name(&document, "span")
+        .iter()
+        .rev()
+    {
         if let Some(next) = dom::next_sibling(span) {
             if dom::class_name(span) == "del"
                 && dom::is_element(&next)

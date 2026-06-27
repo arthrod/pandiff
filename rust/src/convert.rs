@@ -64,8 +64,8 @@ pub fn convert(source: &str, opts: &Options) -> Result<String> {
 
 /// Extract the leading YAML metadata block (`---` … `---`) from a file, or "".
 pub fn extract_metadata(source: &str) -> Result<String> {
-    let file = std::fs::read_to_string(source)
-        .with_context(|| format!("failed reading {source}"))?;
+    let file =
+        std::fs::read_to_string(source).with_context(|| format!("failed reading {source}"))?;
     let lines: Vec<&str> = file.split('\n').collect();
     if lines.is_empty() || lines[0].trim() != "---" {
         return Ok(String::new());

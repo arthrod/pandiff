@@ -74,7 +74,7 @@ fn end_of_atomic_tag(word: &str, tag: &str) -> bool {
     if word.len() < want {
         return false;
     }
-    &word[word.len() - want..] == needle
+    word[word.len() - want..] == needle
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +411,8 @@ fn find_best_match(segment: &Segment) -> Option<Match> {
 
         for &after_index in after_locations {
             let best_len = best_match.as_ref().map(|m| m.length).unwrap_or(0);
-            if let Some(m) = get_full_match(segment, before_index, after_index, best_len, look_behind)
+            if let Some(m) =
+                get_full_match(segment, before_index, after_index, best_len, look_behind)
             {
                 if m.length > best_len {
                     best_match = Some(m);
@@ -439,10 +440,8 @@ fn get_full_match(
         return None;
     }
 
-    if min_length > 0 {
-        if before_tokens[min_before].key != after_tokens[min_after].key {
-            return None;
-        }
+    if min_length > 0 && before_tokens[min_before].key != after_tokens[min_after].key {
+        return None;
     }
 
     let mut searching = true;
@@ -462,12 +461,15 @@ fn get_full_match(
 
     let mut before_start = before_start;
     let mut after_start = after_start;
-    if look_behind && before_start > 0 && after_start > 0 {
-        if before_tokens[before_start - 1].key == " " && after_tokens[after_start - 1].key == " " {
-            before_start -= 1;
-            after_start -= 1;
-            current_length += 1;
-        }
+    if look_behind
+        && before_start > 0
+        && after_start > 0
+        && before_tokens[before_start - 1].key == " "
+        && after_tokens[after_start - 1].key == " "
+    {
+        before_start -= 1;
+        after_start -= 1;
+        current_length += 1;
     }
 
     Some(Match::new(
@@ -487,8 +489,7 @@ fn find_matching_blocks(segment: Segment) -> Vec<Match> {
         if let Some(m) = find_best_match(&segment) {
             if m.length > 0 {
                 if m.segment_start_in_before > 0 && m.segment_start_in_after > 0 {
-                    let left_before =
-                        segment.before_tokens[..m.segment_start_in_before].to_vec();
+                    let left_before = segment.before_tokens[..m.segment_start_in_before].to_vec();
                     let left_after = segment.after_tokens[..m.segment_start_in_after].to_vec();
                     segments.push(create_segment(
                         left_before,
@@ -550,13 +551,7 @@ fn calculate_operations(before_tokens: &[Token], after_tokens: &[Token]) -> Vec<
 
     let segment = create_segment(before_tokens.to_vec(), after_tokens.to_vec(), 0, 0);
     let mut matches = find_matching_blocks(segment);
-    matches.push(Match::new(
-        before_tokens.len(),
-        after_tokens.len(),
-        0,
-        0,
-        0,
-    ));
+    matches.push(Match::new(before_tokens.len(), after_tokens.len(), 0, 0, 0));
 
     for m in &matches {
         let mut action: Option<Action> = None;
@@ -684,7 +679,9 @@ fn combine_wrap(
             let data_attrs =
                 format!(" data-diff-node=\"{tag}\" data-{prefix}operation-index=\"{op_index}\"");
             toks[i] = RE_TRAILING_GT
-                .replace(&toks[i], |c: &regex::Captures| format!("{}{}", data_attrs, &c[0]))
+                .replace(&toks[i], |c: &regex::Captures| {
+                    format!("{}{}", data_attrs, &c[0])
+                })
                 .into_owned();
         }
     }

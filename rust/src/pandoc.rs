@@ -38,5 +38,5 @@ pub fn pandoc(args: &[String], input: Option<&str>) -> Result<String> {
     if !output.status.success() {
         bail!("pandoc exited with status {}", output.status);
     }
-    Ok(String::from_utf8(output.stdout).context("pandoc produced invalid UTF-8")?)
+    String::from_utf8(output.stdout).context("pandoc produced invalid UTF-8")
 }

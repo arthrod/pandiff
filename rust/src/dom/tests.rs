@@ -61,9 +61,8 @@ fn clone_tree_is_independent() {
 
 #[test]
 fn selectors_classes_and_ancestors() {
-    let dom = parse(
-        "<p><span class=\"math inline\">a</span><span class=\"math display\">b</span></p>",
-    );
+    let dom =
+        parse("<p><span class=\"math inline\">a</span><span class=\"math display\">b</span></p>");
     assert_eq!(
         elements_by_tag_and_classes(&dom.document, "span", &["math", "inline"]).len(),
         1

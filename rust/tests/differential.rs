@@ -16,7 +16,11 @@ fn root() -> PathBuf {
 }
 
 fn test_path(name: &str) -> String {
-    root().join("test").join(name).to_string_lossy().into_owned()
+    root()
+        .join("test")
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn golden(name: &str) -> String {
@@ -265,6 +269,31 @@ fn normalise_round_trip() {
         .unwrap()
         .unwrap();
     assert_eq!(out, golden("normalise"));
+}
+
+#[test]
+fn output_word_docx_round_trip() {
+    if !pandoc_available() {
+        return;
+    }
+    let out_path = std::env::temp_dir().join("rust_diff.docx");
+    let out_path = out_path.to_string_lossy().into_owned();
+    let res = pandiff(
+        &test_path("old.md"),
+        &test_path("new.md"),
+        Options {
+            files: true,
+            output: Some(out_path.clone()),
+            resource_path: Some(test_path("")),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(res.is_none(), "file output should return None");
+    let text = pandiff::track_changes(&out_path, Options::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(text, golden("docx_roundtrip"));
 }
 
 #[test]

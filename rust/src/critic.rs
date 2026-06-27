@@ -40,7 +40,12 @@ fn apply_critic(text: &str, del: &str, ins: &str, sub: &str) -> String {
 
 /// `{--a--}` → `<del>a</del>`, etc.
 pub fn critic_html(text: &str) -> String {
-    apply_critic(text, "<del>${1}</del>", "<ins>${1}</ins>", "<del>${1}</del><ins>${2}</ins>")
+    apply_critic(
+        text,
+        "<del>${1}</del>",
+        "<ins>${1}</ins>",
+        "<del>${1}</del><ins>${2}</ins>",
+    )
 }
 
 /// LaTeX coloured-markup form.
@@ -115,10 +120,7 @@ mod tests {
 
     #[test]
     fn latex_conversion() {
-        assert_eq!(
-            critic_latex("{++x++}"),
-            r"<span>\color{OliveGreen}x</span>"
-        );
+        assert_eq!(critic_latex("{++x++}"), r"<span>\color{OliveGreen}x</span>");
     }
 
     #[test]
