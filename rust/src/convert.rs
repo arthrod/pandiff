@@ -86,8 +86,12 @@ mod tests {
     use std::io::Write;
 
     fn tmp_file(name: &str, content: &str) -> String {
+        // Make the name unique per process and per call so concurrent test
+        // workers (and repeated runs) never share or clobber a fixed path.
+        static COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("pandiff_test_{name}"));
+        let path = dir.join(format!("pandiff_test_{}_{n}_{name}", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(content.as_bytes()).unwrap();
         path.to_string_lossy().into_owned()

@@ -55,9 +55,9 @@ pub fn wordwrap(columns: usize, text: &str) -> String {
         }
         let chunk = raw.replace('\t', "    ");
         let i = lines.len() - 1;
-        // JS `.length` counts UTF-16 units; char count matches for the BMP text
-        // Pandoc emits here.
-        if lines[i].chars().count() + chunk.chars().count() > stop {
+        // JS `.length` counts UTF-16 code units, so use the same measure here
+        // (matters only for non-BMP input; Pandoc's prose here is BMP).
+        if lines[i].encode_utf16().count() + chunk.encode_utf16().count() > stop {
             let trimmed = lines[i].trim_end().to_string();
             lines[i] = trimmed;
             for c in chunk.split('\n') {

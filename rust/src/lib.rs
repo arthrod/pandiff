@@ -52,7 +52,10 @@ pub fn pandiff(source1: &str, source2: &str, opts: Options) -> Result<Option<Str
     let unmodified = RE_INS
         .replace_all(&RE_DEL.replace_all(&html, ""), "")
         .into_owned();
-    let similarity = unmodified.chars().count() as f64 / html.chars().count().max(1) as f64;
+    // JS `String.length` counts UTF-16 code units, so match it exactly (non-BMP
+    // characters like emoji count as 2) to keep threshold decisions identical.
+    let similarity =
+        unmodified.encode_utf16().count() as f64 / html.encode_utf16().count().max(1) as f64;
     if let Some(threshold) = opts.threshold {
         if threshold != 0.0 && similarity < threshold {
             eprintln!(

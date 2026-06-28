@@ -81,7 +81,9 @@ struct Cli {
     wrap: Option<String>,
     #[arg(long)]
     metadata: Option<String>,
-    #[arg(trailing_var_arg = true)]
+    // Plain positional (no `trailing_var_arg`): like the TS CLI's
+    // command-line-args `defaultOption`, options stay parseable whether they
+    // appear before or after the file arguments.
     files: Vec<String>,
 }
 

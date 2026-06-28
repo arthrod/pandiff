@@ -331,7 +331,9 @@ fn output_word_docx_round_trip() {
     if !pandoc_available() {
         return;
     }
-    let out_path = std::env::temp_dir().join("rust_diff.docx");
+    // Unique per process so parallel `cargo test` workers / repeated runs don't
+    // share or clobber the same output file.
+    let out_path = std::env::temp_dir().join(format!("rust_diff_{}.docx", std::process::id()));
     let out_path = out_path.to_string_lossy().into_owned();
     let res = pandiff(
         &test_path("old.md"),

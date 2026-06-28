@@ -24,12 +24,15 @@ pub fn pandoc(args: &[String], input: Option<&str>) -> Result<String> {
         .context("failed to spawn pandoc (is it installed and on PATH?)")?;
 
     if let Some(inp) = input {
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(inp.as_bytes())
-            .context("failed writing to pandoc stdin")?;
+        let mut stdin = child.stdin.take().unwrap();
+        let write_res = stdin.write_all(inp.as_bytes());
+        // Close stdin so pandoc can proceed, then, if the write failed, reap the
+        // child before returning so we never leak a zombie process.
+        drop(stdin);
+        if let Err(e) = write_res {
+            let _ = child.wait();
+            return Err(e).context("failed writing to pandoc stdin");
+        }
     }
 
     let output = child
@@ -38,7 +41,9 @@ pub fn pandoc(args: &[String], input: Option<&str>) -> Result<String> {
     if !output.status.success() {
         bail!("pandoc exited with status {}", output.status);
     }
-    String::from_utf8(output.stdout).context("pandoc produced invalid UTF-8")
+    // Mirror `nodejs-sh`'s `.toString()`, i.e. Node's `Buffer.toString('utf8')`:
+    // a lossy decode (invalid bytes become U+FFFD) rather than a hard error.
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 // The success path is exercised by every golden test; the non-zero-exit `bail`
