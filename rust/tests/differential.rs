@@ -80,19 +80,28 @@ input_format_test!(input_rst, "rst", "in_rst");
 input_format_test!(input_textile, "textile", "in_textile");
 input_format_test!(input_word, "docx", "in_docx");
 
-/// Remove every `<style>...</style>` block. Standalone HTML embeds Pandoc's
-/// bundled syntax-highlighting CSS, which differs between Pandoc builds (e.g. the
-/// apt package vs. the official binary emit slightly different `sourceCode` rules)
-/// even at the same version. That CSS is Pandoc's, not pandiff's, so comparing it
-/// would make the golden test fragile to the reviewer's Pandoc build rather than
-/// to any pandiff behaviour.
-fn strip_style_blocks(html: &str) -> String {
-    let mut out = String::with_capacity(html.len());
-    let mut rest = html;
-    while let Some(start) = rest.find("<style") {
-        out.push_str(&rest[..start]);
-        match rest[start..].find("</style>") {
-            Some(end) => rest = &rest[start + end + "</style>".len()..],
+/// Normalise Pandoc-build-specific chrome out of a standalone HTML document so
+/// the golden comparison tests pandiff's output, not Pandoc's template.
+///
+/// Two things vary between Pandoc 3.1.3 builds (e.g. the Debian/apt package vs.
+/// the official release binary) even though pandiff drives them identically:
+/// the bundled syntax-highlighting CSS inside `<style>` blocks (one
+/// `pre > code.sourceCode > span` rule differs), and an IE9 `html5shiv`
+/// conditional comment that the official build injects into `<head>` and the
+/// apt build omits. Neither is produced by pandiff, so both are stripped here.
+fn normalize_standalone(html: &str) -> String {
+    let no_style = strip_between(html, "<style", "</style>");
+    strip_between(&no_style, "<!--[if", "<![endif]-->")
+}
+
+/// Remove every `start ..= end` span (inclusive of the `end` marker).
+fn strip_between(input: &str, start: &str, end: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(s) = rest.find(start) {
+        out.push_str(&rest[..s]);
+        match rest[s..].find(end) {
+            Some(e) => rest = &rest[s + e + end.len()..],
             None => {
                 rest = "";
                 break;
@@ -122,8 +131,8 @@ fn output_html() {
     .unwrap()
     .unwrap();
     assert_eq!(
-        strip_style_blocks(&out),
-        strip_style_blocks(&golden("out_html"))
+        normalize_standalone(&out),
+        normalize_standalone(&golden("out_html"))
     );
 }
 
