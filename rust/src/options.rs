@@ -75,7 +75,10 @@ impl Options {
     /// pandoc CLI arguments. Boolean options emit `--name` only when true,
     /// array options emit one `--name=value` per element, and scalar options
     /// emit `--name=value` when present.
-    pub fn build_args(&self, params: &[&str]) -> Vec<String> {
+    ///
+    /// `pub(crate)`: the `params` selector is stringly-typed and panics on an
+    /// unknown name, so this stays an internal helper rather than public API.
+    pub(crate) fn build_args(&self, params: &[&str]) -> Vec<String> {
         let mut args = Vec::new();
         for param in params {
             match *param {
