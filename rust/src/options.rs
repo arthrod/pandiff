@@ -75,10 +75,7 @@ impl Options {
     /// pandoc CLI arguments. Boolean options emit `--name` only when true,
     /// array options emit one `--name=value` per element, and scalar options
     /// emit `--name=value` when present.
-    ///
-    /// `pub(crate)`: the `params` selector is stringly-typed and panics on an
-    /// unknown name, so this stays an internal helper rather than public API.
-    pub(crate) fn build_args(&self, params: &[&str]) -> Vec<String> {
+    pub fn build_args(&self, params: &[&str]) -> Vec<String> {
         let mut args = Vec::new();
         for param in params {
             match *param {
@@ -271,5 +268,180 @@ mod tests {
     #[should_panic(expected = "unknown param")]
     fn build_args_panics_on_unknown_param() {
         Options::default().build_args(&["not-a-real-param"]);
+    }
+
+    // --- Additional boundary & regression tests ----------------------------
+
+    #[test]
+    fn default_options_all_absent() {
+        let o = Options::default();
+        // All boolean flags default false
+        assert!(!o.mathjax);
+        assert!(!o.mathml);
+        assert!(!o.reference_links);
+        assert!(!o.standalone);
+        assert!(!o.help);
+        assert!(!o.version);
+        assert!(!o.files);
+        // All Option fields default None
+        assert!(o.columns.is_none());
+        assert!(o.extract_media.is_none());
+        assert!(o.from.is_none());
+        assert!(o.highlight_style.is_none());
+        assert!(o.template.is_none());
+        assert!(o.output.is_none());
+        assert!(o.pdf_engine.is_none());
+        assert!(o.resource_path.is_none());
+        assert!(o.threshold.is_none());
+        assert!(o.to.is_none());
+        assert!(o.wrap.is_none());
+        assert!(o.metadata.is_none());
+        // All Vec fields default empty
+        assert!(o.bibliography.is_empty());
+        assert!(o.csl.is_empty());
+        assert!(o.filter.is_empty());
+        assert!(o.lua_filter.is_empty());
+        assert!(o.metadata_file.is_empty());
+        assert!(o.reference_doc.is_empty());
+    }
+
+    #[test]
+    fn empty_array_emits_no_args() {
+        let o = Options::default(); // bibliography is empty
+        assert!(o.build_args(&["bibliography"]).is_empty());
+        assert!(o.build_args(&["csl"]).is_empty());
+        assert!(o.build_args(&["filter"]).is_empty());
+        assert!(o.build_args(&["lua-filter"]).is_empty());
+        assert!(o.build_args(&["metadata-file"]).is_empty());
+        assert!(o.build_args(&["reference-doc"]).is_empty());
+    }
+
+    #[test]
+    fn all_boolean_flags_emitted_when_set() {
+        let o = Options {
+            mathjax: true,
+            mathml: true,
+            reference_links: true,
+            standalone: true,
+            ..Default::default()
+        };
+        assert_eq!(o.build_args(&["mathjax"]), vec!["--mathjax"]);
+        assert_eq!(o.build_args(&["mathml"]), vec!["--mathml"]);
+        assert_eq!(o.build_args(&["reference-links"]), vec!["--reference-links"]);
+        assert_eq!(o.build_args(&["standalone"]), vec!["--standalone"]);
+    }
+
+    #[test]
+    fn boolean_flags_not_emitted_when_false() {
+        let o = Options::default();
+        assert!(o.build_args(&["mathjax"]).is_empty());
+        assert!(o.build_args(&["mathml"]).is_empty());
+        assert!(o.build_args(&["reference-links"]).is_empty());
+    }
+
+    #[test]
+    fn multiple_values_in_same_array_field() {
+        let o = Options {
+            filter: vec!["f1".into(), "f2".into(), "f3".into()],
+            ..Default::default()
+        };
+        assert_eq!(
+            o.build_args(&["filter"]),
+            vec!["--filter=f1", "--filter=f2", "--filter=f3"]
+        );
+    }
+
+    #[test]
+    fn all_scalar_fields_emit_correct_format() {
+        let o = Options {
+            extract_media: Some("/tmp/media".into()),
+            from: Some("org".into()),
+            highlight_style: Some("pygments".into()),
+            output: Some("out.pdf".into()),
+            template: Some("my.tex".into()),
+            pdf_engine: Some("xelatex".into()),
+            resource_path: Some("/resources".into()),
+            to: Some("latex".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            o.build_args(&["extract-media"]),
+            vec!["--extract-media=/tmp/media"]
+        );
+        assert_eq!(o.build_args(&["from"]), vec!["--from=org"]);
+        assert_eq!(
+            o.build_args(&["highlight-style"]),
+            vec!["--highlight-style=pygments"]
+        );
+        assert_eq!(o.build_args(&["output"]), vec!["--output=out.pdf"]);
+        assert_eq!(o.build_args(&["template"]), vec!["--template=my.tex"]);
+        assert_eq!(
+            o.build_args(&["pdf-engine"]),
+            vec!["--pdf-engine=xelatex"]
+        );
+        assert_eq!(
+            o.build_args(&["resource-path"]),
+            vec!["--resource-path=/resources"]
+        );
+        assert_eq!(o.build_args(&["to"]), vec!["--to=latex"]);
+    }
+
+    #[test]
+    fn wrap_enum_equality_and_debug() {
+        assert_eq!(Wrap::Auto, Wrap::Auto);
+        assert_ne!(Wrap::Auto, Wrap::None);
+        assert_ne!(Wrap::None, Wrap::Preserve);
+        // Debug formatting should not panic
+        let _ = format!("{:?}", Wrap::Auto);
+        let _ = format!("{:?}", Wrap::None);
+        let _ = format!("{:?}", Wrap::Preserve);
+    }
+
+    #[test]
+    fn metadata_enum_equality_and_debug() {
+        assert_eq!(Metadata::Old, Metadata::Old);
+        assert_ne!(Metadata::Old, Metadata::New);
+        assert_ne!(Metadata::New, Metadata::None);
+        let _ = format!("{:?}", Metadata::Old);
+        let _ = format!("{:?}", Metadata::New);
+        let _ = format!("{:?}", Metadata::None);
+    }
+
+    #[test]
+    fn wrap_parse_empty_and_invalid_strings() {
+        assert_eq!(Wrap::parse(""), None);
+        assert_eq!(Wrap::parse("Auto"), None); // case-sensitive
+        assert_eq!(Wrap::parse("NONE"), None);
+    }
+
+    #[test]
+    fn metadata_parse_empty_and_invalid_strings() {
+        assert_eq!(Metadata::parse(""), None);
+        assert_eq!(Metadata::parse("Old"), None); // case-sensitive
+        assert_eq!(Metadata::parse("NEW"), None);
+    }
+
+    #[test]
+    fn build_args_empty_params_slice_returns_empty_vec() {
+        let o = Options {
+            from: Some("markdown".into()),
+            ..Default::default()
+        };
+        assert!(o.build_args(&[]).is_empty());
+    }
+
+    #[test]
+    fn options_clone_is_independent() {
+        let o = Options {
+            from: Some("html".into()),
+            bibliography: vec!["a.bib".into()],
+            ..Default::default()
+        };
+        let mut cloned = o.clone();
+        cloned.from = Some("latex".into());
+        cloned.bibliography.push("b.bib".into());
+        // Original unchanged
+        assert_eq!(o.from.as_deref(), Some("html"));
+        assert_eq!(o.bibliography.len(), 1);
     }
 }

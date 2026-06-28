@@ -352,4 +352,161 @@ mod tests {
         assert!(!args.iter().any(|a| a.ends_with("github-markdown.css")));
         assert!(!args.contains(&"-s".to_string()));
     }
+
+    // --- Additional boundary & regression tests ----------------------------
+
+    #[test]
+    fn ext_of_handles_nested_paths() {
+        assert_eq!(ext_of("/some/path/to/diff.tex"), ".tex");
+        assert_eq!(ext_of("relative/path/out.docx"), ".docx");
+        assert_eq!(ext_of("file"), "");
+        assert_eq!(ext_of(".hidden"), ""); // dotfile without extension
+    }
+
+    #[test]
+    fn ext_of_html_extension() {
+        assert_eq!(ext_of("output.html"), ".html");
+    }
+
+    #[test]
+    fn prepare_postrender_tex_extension_triggers_latex() {
+        let mut o = Options {
+            output: Some("diff.tex".into()),
+            ..Default::default()
+        };
+        let (body, args) = prepare_postrender("{--removed--}", &mut o);
+        assert!(body.contains("\\color{Maroon}"), "expected LaTeX coloring");
+        assert!(args.iter().any(|a| a == "colorlinks=true"));
+    }
+
+    #[test]
+    fn prepare_postrender_to_docx_uses_track_changes() {
+        let mut o = Options {
+            to: Some("docx".into()),
+            ..Default::default()
+        };
+        let (body, _args) = prepare_postrender("{~~a~>b~~}", &mut o);
+        assert!(body.contains("class=\"deletion\""));
+        assert!(body.contains("class=\"insertion\""));
+    }
+
+    #[test]
+    fn prepare_postrender_to_html_non_standalone_no_css() {
+        let mut o = Options {
+            to: Some("html".into()),
+            standalone: false,
+            ..Default::default()
+        };
+        let (_body, args) = prepare_postrender("{++x++}", &mut o);
+        assert!(!args.iter().any(|a| a.ends_with("github-markdown.css")));
+        // No `-s` flag when not standalone
+        assert!(!args.contains(&"-s".to_string()));
+    }
+
+    #[test]
+    fn prepare_postrender_sets_highlight_style_default() {
+        let mut o = Options::default();
+        // Explicitly absent before call
+        assert!(o.highlight_style.is_none());
+        let _ = prepare_postrender("", &mut o);
+        assert_eq!(o.highlight_style.as_deref(), Some("kate"));
+    }
+
+    #[test]
+    fn prepare_postrender_preserves_explicit_highlight_style() {
+        let mut o = Options {
+            highlight_style: Some("pygments".into()),
+            ..Default::default()
+        };
+        let _ = prepare_postrender("", &mut o);
+        assert_eq!(o.highlight_style.as_deref(), Some("pygments"));
+    }
+
+    #[test]
+    fn prepare_postrender_pdf_output_sets_standalone_true() {
+        let mut o = Options {
+            output: Some("diff.pdf".into()),
+            standalone: false,
+            ..Default::default()
+        };
+        let _ = prepare_postrender("", &mut o);
+        assert!(o.standalone, "PDF output must force standalone=true");
+    }
+
+    #[test]
+    fn prepare_postrender_non_pdf_does_not_set_standalone() {
+        let mut o = Options {
+            output: Some("diff.html".into()),
+            standalone: false,
+            ..Default::default()
+        };
+        let _ = prepare_postrender("", &mut o);
+        assert!(!o.standalone, "non-PDF should not force standalone");
+    }
+
+    #[test]
+    fn rewrap_empty_input_returns_empty() {
+        assert_eq!(rewrap("", false, 72), "");
+    }
+
+    #[test]
+    fn rewrap_code_block_toggle_is_symmetric() {
+        // Opening ``` toggles pre=true, closing ``` toggles back.
+        // Lines inside the block should be preserved verbatim even if long.
+        let input = "```\nlong line aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n```";
+        assert_eq!(rewrap(input, false, 72), input);
+    }
+
+    #[test]
+    fn rewrap_no_wrap_preserves_long_lines() {
+        let long = "word ".repeat(40);
+        let result = rewrap(long.trim_end(), true, 72);
+        // With no_wrap=true, line should not be split
+        assert_eq!(result, long.trim_end());
+    }
+
+    #[test]
+    fn rewrap_setext_underline_longer_than_heading_is_truncated() {
+        let input = "Hi\n=========================\n";
+        let out = rewrap(input.trim_end(), false, 72);
+        assert_eq!(out, "Hi\n==");
+    }
+
+    #[test]
+    fn rewrap_setext_underline_with_empty_preceding_line_is_kept() {
+        // If preceding line is empty (len 0), the underline candidate is left as-is.
+        let input = "\n=========";
+        let out = rewrap(input, false, 72);
+        // No truncation since last_line_len == 0
+        assert_eq!(out, "\n=========");
+    }
+
+    #[test]
+    fn rewrap_reference_link_line_preserved_verbatim() {
+        let input = "  [ref]: http://example.com/very/long/url/that/would/be/wrapped/otherwise/yes/it/would";
+        assert_eq!(rewrap(input, false, 30), input);
+    }
+
+    #[test]
+    fn wrap_columns_zero_gives_72() {
+        let o = Options {
+            columns: Some(0),
+            ..Default::default()
+        };
+        assert_eq!(wrap_columns(&o), 72);
+    }
+
+    #[test]
+    fn pandoc_options_html_has_embed_resources_and_standalone() {
+        let opts = pandoc_options_html();
+        assert!(opts.contains(&"--embed-resources".to_string()));
+        assert!(opts.contains(&"--standalone".to_string()));
+    }
+
+    #[test]
+    fn pandoc_options_html_has_include_before_after_article() {
+        let opts = pandoc_options_html();
+        assert!(opts.iter().any(|a| a.contains("markdown-body")));
+        assert!(opts.iter().any(|a| a.contains("</article>")));
+    }
 }

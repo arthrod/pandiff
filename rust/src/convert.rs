@@ -113,4 +113,54 @@ mod tests {
         let p = tmp_file("meta2.md", "---\ntitle: X\n");
         assert_eq!(extract_metadata(&p).unwrap(), "---\ntitle: X\n\n");
     }
+
+    // --- Additional boundary & regression tests ----------------------------
+
+    #[test]
+    fn metadata_empty_file_returns_empty() {
+        let p = tmp_file("empty.md", "");
+        assert_eq!(extract_metadata(&p).unwrap(), "");
+    }
+
+    #[test]
+    fn metadata_only_opening_dash_fence_returns_opener() {
+        // A single `---` with nothing after it: the metadata loop starts
+        // (lines[0] == "---") but no subsequent lines exist, so the loop body
+        // never executes. Result is ["---"].join("\n") + "\n" = "---\n".
+        // This behaves like the unterminated case but with zero body lines.
+        let p = tmp_file("dashonly.md", "---");
+        assert_eq!(extract_metadata(&p).unwrap(), "---\n");
+    }
+
+    #[test]
+    fn metadata_nonexistent_file_returns_error() {
+        let result = extract_metadata("/nonexistent/path/does_not_exist.md");
+        assert!(
+            result.is_err(),
+            "expected error for missing file, got Ok"
+        );
+    }
+
+    #[test]
+    fn metadata_first_line_not_dashes_returns_empty() {
+        let p = tmp_file("nodash.md", "not a yaml header\n---\nkey: val\n---\n");
+        assert_eq!(extract_metadata(&p).unwrap(), "");
+    }
+
+    #[test]
+    fn metadata_multi_field_block_extracted_correctly() {
+        let content = "---\ntitle: My Doc\nauthor: Alice\ndate: 2024-01-01\n---\n\nBody here.\n";
+        let p = tmp_file("multimeta.md", content);
+        let expected = "---\ntitle: My Doc\nauthor: Alice\ndate: 2024-01-01\n---\n";
+        assert_eq!(extract_metadata(&p).unwrap(), expected);
+    }
+
+    #[test]
+    fn metadata_stops_at_first_closing_fence() {
+        // Two closing `---` fences; extraction should stop at the first one.
+        let content = "---\ntitle: A\n---\nextra: B\n---\n";
+        let p = tmp_file("doublefence.md", content);
+        let expected = "---\ntitle: A\n---\n";
+        assert_eq!(extract_metadata(&p).unwrap(), expected);
+    }
 }

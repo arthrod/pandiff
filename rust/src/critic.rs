@@ -146,4 +146,143 @@ mod tests {
     fn multiline_del_matches() {
         assert_eq!(critic_accept("{--line1\nline2--}"), "");
     }
+
+    // --- Additional boundary & regression tests ----------------------------
+
+    #[test]
+    fn empty_string_is_unchanged() {
+        assert_eq!(critic_html(""), "");
+        assert_eq!(critic_latex(""), "");
+        assert_eq!(critic_track_changes(""), "");
+        assert_eq!(critic_reject(""), "");
+        assert_eq!(critic_accept(""), "");
+        assert_eq!(spans_to_critic(""), "");
+    }
+
+    #[test]
+    fn text_with_no_markers_passes_through_unchanged() {
+        let plain = "Hello, world! No markup here.";
+        assert_eq!(critic_html(plain), plain);
+        assert_eq!(critic_reject(plain), plain);
+        assert_eq!(critic_accept(plain), plain);
+        assert_eq!(spans_to_critic(plain), plain);
+    }
+
+    #[test]
+    fn multiple_del_markers_in_same_string() {
+        assert_eq!(
+            critic_html("{--a--} and {--b--}"),
+            "<del>a</del> and <del>b</del>"
+        );
+        assert_eq!(critic_accept("{--a--} and {--b--}"), " and ");
+        assert_eq!(critic_reject("{--a--} and {--b--}"), "a and b");
+    }
+
+    #[test]
+    fn multiple_ins_markers_in_same_string() {
+        assert_eq!(
+            critic_html("{++x++} and {++y++}"),
+            "<ins>x</ins> and <ins>y</ins>"
+        );
+        assert_eq!(critic_accept("{++x++} and {++y++}"), "x and y");
+        assert_eq!(critic_reject("{++x++} and {++y++}"), " and ");
+    }
+
+    #[test]
+    fn multiple_sub_markers_in_same_string() {
+        assert_eq!(
+            critic_html("{~~a~>b~~} mid {~~c~>d~~}"),
+            "<del>a</del><ins>b</ins> mid <del>c</del><ins>d</ins>"
+        );
+    }
+
+    #[test]
+    fn mixed_del_ins_sub_in_same_string() {
+        let t = "{--del--} {++ins++} {~~old~>new~~}";
+        assert_eq!(
+            critic_html(t),
+            "<del>del</del> <ins>ins</ins> <del>old</del><ins>new</ins>"
+        );
+        assert_eq!(critic_reject(t), "del   old");
+        assert_eq!(critic_accept(t), " ins  new");
+    }
+
+    #[test]
+    fn spans_to_critic_converts_div_del() {
+        assert_eq!(
+            spans_to_critic(r#"<div class="del">paragraph text</div>"#),
+            "{--paragraph text--}"
+        );
+    }
+
+    #[test]
+    fn spans_to_critic_converts_div_ins() {
+        assert_eq!(
+            spans_to_critic(r#"<div class="ins">paragraph text</div>"#),
+            "{++paragraph text++}"
+        );
+    }
+
+    #[test]
+    fn spans_to_critic_div_strips_surrounding_whitespace() {
+        // The DIV_DEL regex includes `\s*` around the capture group
+        assert_eq!(
+            spans_to_critic("<div class=\"del\">\n  hello\n</div>"),
+            "{--hello--}"
+        );
+    }
+
+    #[test]
+    fn spans_to_critic_sub_handled_before_plain_del_ins() {
+        // If sub were not handled first, the inner del/ins spans would be
+        // converted independently, producing malformed CriticMarkup.
+        let input = r#"<span class="sub"><span class="del">old</span><span class="ins">new</span></span>"#;
+        assert_eq!(spans_to_critic(input), "{~~old~>new~~}");
+    }
+
+    #[test]
+    fn spans_to_critic_multiple_spans() {
+        let input = r#"<span class="del">a</span> and <span class="ins">b</span>"#;
+        assert_eq!(spans_to_critic(input), "{--a--} and {++b++}");
+    }
+
+    #[test]
+    fn critic_html_with_content_containing_special_chars() {
+        // Angle brackets and ampersands inside a deletion should pass through
+        assert_eq!(critic_html("{--<em>x</em>--}"), "<del><em>x</em></del>");
+    }
+
+    #[test]
+    fn critic_sub_with_gt_inside_new_half() {
+        // `>` inside the replacement half should not terminate the pattern early
+        assert_eq!(critic_accept("{~~old~>a>b~~}"), "a>b");
+        assert_eq!(critic_reject("{~~old~>a>b~~}"), "old");
+    }
+
+    #[test]
+    fn critic_latex_del_produces_strikethrough() {
+        let out = critic_latex("{--removed--}");
+        assert!(out.contains("\\color{Maroon}"), "expected Maroon color");
+        assert!(out.contains("removed"), "expected original text");
+    }
+
+    #[test]
+    fn critic_latex_sub_produces_both_halves() {
+        let out = critic_latex("{~~old~>new~~}");
+        assert!(out.contains("RedOrange"), "expected RedOrange color");
+        assert!(out.contains("old"), "expected old text");
+        assert!(out.contains("new"), "expected new text");
+    }
+
+    #[test]
+    fn critic_track_changes_del_uses_deletion_class() {
+        let out = critic_track_changes("{--removed--}");
+        assert_eq!(out, r#"<span class="deletion">removed</span>"#);
+    }
+
+    #[test]
+    fn critic_track_changes_ins_uses_insertion_class() {
+        let out = critic_track_changes("{++added++}");
+        assert_eq!(out, r#"<span class="insertion">added</span>"#);
+    }
 }

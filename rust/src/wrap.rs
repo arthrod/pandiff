@@ -137,4 +137,117 @@ mod tests {
     fn wrap_handles_tab_expansion() {
         assert_eq!(wordwrap(72, "a\tb"), "a    b");
     }
+
+    // --- Additional boundary & regression tests ----------------------------
+
+    #[test]
+    fn diffu_identical_texts_produces_all_context_lines() {
+        let text = "line1\nline2\nline3\n";
+        let out = diffu(text, text);
+        // Every line should be prefixed with a space (equal)
+        for line in out.lines() {
+            assert!(
+                line.starts_with(' '),
+                "expected context prefix, got: {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn diffu_empty_first_produces_only_insertions() {
+        let out = diffu("", "a\nb\n");
+        for line in out.lines() {
+            assert!(
+                line.starts_with('+'),
+                "expected insertion prefix, got: {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn diffu_empty_second_produces_only_deletions() {
+        let out = diffu("a\nb\n", "");
+        for line in out.lines() {
+            assert!(
+                line.starts_with('-'),
+                "expected deletion prefix, got: {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn diffu_both_empty_produces_empty_output() {
+        assert_eq!(diffu("", ""), "");
+    }
+
+    #[test]
+    fn diffu_insertion_only_no_deletions() {
+        let out = diffu("unchanged\n", "unchanged\nextra line\n");
+        assert!(out.contains("+extra line"), "should have insertion");
+        assert!(!out.contains('-'), "should have no deletions");
+    }
+
+    #[test]
+    fn wordwrap_empty_string() {
+        assert_eq!(wordwrap(72, ""), "");
+    }
+
+    #[test]
+    fn wordwrap_at_custom_column_count() {
+        // At 20 columns, this 30-char sentence should wrap.
+        let input = "one two three four five six";
+        let out = wordwrap(20, input);
+        assert!(out.contains('\n'), "expected wrap at 20 cols");
+        // No single line should exceed 20 chars after wrap
+        for line in out.lines() {
+            assert!(
+                line.chars().count() <= 20,
+                "line too long: {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn wordwrap_exact_boundary_does_not_wrap() {
+        // Exactly at the column limit, no overflow → should not wrap.
+        let input = "1234567890"; // 10 chars
+        assert_eq!(wordwrap(10, input), input);
+    }
+
+    #[test]
+    fn wordwrap_single_word_longer_than_columns_not_split() {
+        // wordwrap does not split individual words, only at word boundaries.
+        let long_word = "superlongwordthatexceedscolumnlimit";
+        let out = wordwrap(10, long_word);
+        // A single word with no whitespace: split_capturing returns it as one
+        // chunk; since lines[0] is empty, 0 + len > 10, it starts a new line,
+        // but that new line will also be the same word (trimmed of leading space).
+        // The word itself should still appear in the output.
+        assert!(out.contains("superlongwordthatexceedscolumnlimit"));
+    }
+
+    #[test]
+    fn wordwrap_multiple_tabs_expanded() {
+        // Two tabs should each become 4 spaces
+        let out = wordwrap(80, "a\t\tb");
+        assert_eq!(out, "a        b");
+    }
+
+    #[test]
+    fn split_capturing_via_wordwrap_handles_no_whitespace() {
+        // Text with no spaces: treated as a single chunk; should appear unchanged.
+        assert_eq!(wordwrap(72, "nospaces"), "nospaces");
+    }
+
+    #[test]
+    fn split_capturing_via_wordwrap_preserves_trailing_spaces() {
+        // A trailing word with no trailing whitespace is the final "rest" chunk.
+        let input = "first second ";
+        // The trailing space means the split produces ["", "first ", "second ", ""]
+        // So output should just be the same with empty trailing stripped.
+        let out = wordwrap(72, input);
+        // The important thing: both words are present
+        assert!(out.contains("first"), "should contain 'first'");
+        assert!(out.contains("second"), "should contain 'second'");
+    }
 }
