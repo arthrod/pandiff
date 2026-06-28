@@ -91,7 +91,15 @@ input_format_test!(input_word, "docx", "in_docx");
 /// apt build omits. Neither is produced by pandiff, so both are stripped here.
 fn normalize_standalone(html: &str) -> String {
     let no_style = strip_between(html, "<style", "</style>");
-    strip_between(&no_style, "<!--[if", "<![endif]-->")
+    let no_cond = strip_between(&no_style, "<!--[if", "<![endif]-->");
+    // Stripping a block leaves behind its surrounding indentation as a
+    // whitespace-only line; drop those from both sides so the residue of a
+    // removed Pandoc-template block does not itself cause a mismatch.
+    no_cond
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Remove every `start ..= end` span (inclusive of the `end` marker).
