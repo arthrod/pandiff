@@ -135,10 +135,7 @@ mod tests {
     #[test]
     fn metadata_nonexistent_file_returns_error() {
         let result = extract_metadata("/nonexistent/path/does_not_exist.md");
-        assert!(
-            result.is_err(),
-            "expected error for missing file, got Ok"
-        );
+        assert!(result.is_err(), "expected error for missing file, got Ok");
     }
 
     #[test]

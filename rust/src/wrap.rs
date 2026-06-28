@@ -200,10 +200,7 @@ mod tests {
         assert!(out.contains('\n'), "expected wrap at 20 cols");
         // No single line should exceed 20 chars after wrap
         for line in out.lines() {
-            assert!(
-                line.chars().count() <= 20,
-                "line too long: {line:?}"
-            );
+            assert!(line.chars().count() <= 20, "line too long: {line:?}");
         }
     }
 

@@ -80,6 +80,29 @@ input_format_test!(input_rst, "rst", "in_rst");
 input_format_test!(input_textile, "textile", "in_textile");
 input_format_test!(input_word, "docx", "in_docx");
 
+/// Remove every `<style>...</style>` block. Standalone HTML embeds Pandoc's
+/// bundled syntax-highlighting CSS, which differs between Pandoc builds (e.g. the
+/// apt package vs. the official binary emit slightly different `sourceCode` rules)
+/// even at the same version. That CSS is Pandoc's, not pandiff's, so comparing it
+/// would make the golden test fragile to the reviewer's Pandoc build rather than
+/// to any pandiff behaviour.
+fn strip_style_blocks(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(start) = rest.find("<style") {
+        out.push_str(&rest[..start]);
+        match rest[start..].find("</style>") {
+            Some(end) => rest = &rest[start + end + "</style>".len()..],
+            None => {
+                rest = "";
+                break;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 #[test]
 fn output_html() {
     if !pandoc_available() {
@@ -98,7 +121,10 @@ fn output_html() {
     )
     .unwrap()
     .unwrap();
-    assert_eq!(out, golden("out_html"));
+    assert_eq!(
+        strip_style_blocks(&out),
+        strip_style_blocks(&golden("out_html"))
+    );
 }
 
 #[test]

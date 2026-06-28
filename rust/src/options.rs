@@ -327,7 +327,10 @@ mod tests {
         };
         assert_eq!(o.build_args(&["mathjax"]), vec!["--mathjax"]);
         assert_eq!(o.build_args(&["mathml"]), vec!["--mathml"]);
-        assert_eq!(o.build_args(&["reference-links"]), vec!["--reference-links"]);
+        assert_eq!(
+            o.build_args(&["reference-links"]),
+            vec!["--reference-links"]
+        );
         assert_eq!(o.build_args(&["standalone"]), vec!["--standalone"]);
     }
 
@@ -375,10 +378,7 @@ mod tests {
         );
         assert_eq!(o.build_args(&["output"]), vec!["--output=out.pdf"]);
         assert_eq!(o.build_args(&["template"]), vec!["--template=my.tex"]);
-        assert_eq!(
-            o.build_args(&["pdf-engine"]),
-            vec!["--pdf-engine=xelatex"]
-        );
+        assert_eq!(o.build_args(&["pdf-engine"]), vec!["--pdf-engine=xelatex"]);
         assert_eq!(
             o.build_args(&["resource-path"]),
             vec!["--resource-path=/resources"]

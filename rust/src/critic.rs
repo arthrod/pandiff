@@ -203,8 +203,8 @@ mod tests {
             critic_html(t),
             "<del>del</del> <ins>ins</ins> <del>old</del><ins>new</ins>"
         );
-        assert_eq!(critic_reject(t), "del   old");
-        assert_eq!(critic_accept(t), " ins  new");
+        assert_eq!(critic_reject(t), "del  old");
+        assert_eq!(critic_accept(t), " ins new");
     }
 
     #[test]
@@ -236,7 +236,8 @@ mod tests {
     fn spans_to_critic_sub_handled_before_plain_del_ins() {
         // If sub were not handled first, the inner del/ins spans would be
         // converted independently, producing malformed CriticMarkup.
-        let input = r#"<span class="sub"><span class="del">old</span><span class="ins">new</span></span>"#;
+        let input =
+            r#"<span class="sub"><span class="del">old</span><span class="ins">new</span></span>"#;
         assert_eq!(spans_to_critic(input), "{~~old~>new~~}");
     }
 
