@@ -1,0 +1,6 @@
+fastapi>=0.100.0,<0.105.0
+uvicorn>=0.23.0,<0.25.0
+python-multipart>=0.0.6
+pytest>=7.0.0,<8.0.0
+httpx>=0.24.0,<0.26.0
+requests>=2.25.0,<3.0.0
